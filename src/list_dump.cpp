@@ -153,15 +153,17 @@ void _dump_impl(list_t *list, FILE *logfile, const char *log_dirname, const char
 
     const size_t DLINA_CTPOKI = 128;
     char CTPOKA[DLINA_CTPOKI] = "";
-    print_centered(logfile, "", 9);
+    print_centered(logfile, "", 6);
+    fprintf(logfile, "|");
     for (size_t i = 0; i < list->capacity; ++i) {
         snprintf(CTPOKA, DLINA_CTPOKI, "[%zu]", i);
         print_centered(logfile, CTPOKA, 9);
+        fprintf(logfile, "|");
     }
     fprintf(logfile, "\n");
 
     size_t free_idx = list->free_idx;
-    fprintf(logfile, "data is: ");
+    fprintf(logfile, "data: |");
     for (size_t i = 0; i < list->capacity; ++i) {
         if (i == 0)
             snprintf(CTPOKA, DLINA_CTPOKI, "PSN");
@@ -174,24 +176,27 @@ void _dump_impl(list_t *list, FILE *logfile, const char *log_dirname, const char
 
         // fprintf(logfile, " [%zu] ", i);
         print_centered(logfile, CTPOKA, 9);
+        fprintf(logfile, "|");
     }
     fprintf(logfile, "\n");
 
-    fprintf(logfile, "next is: ");
+    fprintf(logfile, "next: |");
     for (size_t i = 0; i < list->capacity; ++i) {
         snprintf(CTPOKA, DLINA_CTPOKI, "%zu", elements[i].next);
 
         // fprintf(logfile, " [%zu] ", i);
         print_centered(logfile, CTPOKA, 9);
+        fprintf(logfile, "|");
     }
     fprintf(logfile, "\n");
 
-    fprintf(logfile, "prev is: ");
+    fprintf(logfile, "prev: |");
     for (size_t i = 0; i < list->capacity; ++i) {
         snprintf(CTPOKA, DLINA_CTPOKI, "%lld", elements[i].prev);
 
         // fprintf(logfile, " [%zu] ", i);
         print_centered(logfile, CTPOKA, 9);
+        fprintf(logfile, "|");
     }
     fprintf(logfile, "\n");
 
