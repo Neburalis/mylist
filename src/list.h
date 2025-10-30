@@ -7,6 +7,8 @@ namespace mylist {
 
 typedef int list_containing_t;
 
+int list_contairing_t_comparator(int first, int second);
+
 enum LIST_ERRNO {
     LIST_NO_PROBLEM = 0,
     LIST_POISON_COLLISION,
@@ -71,11 +73,19 @@ size_t get_next_element(list_t *list, size_t element_idx);
 // get index of prev element
 size_t get_prev_element(list_t *list, size_t element_idx);
 
+namespace slow {
+    // get index by logic index
+    size_t index(list_t *list, size_t logic_index);
+
+    // search index of the first occurrence of a value (0 if not found)
+    size_t search(list_t *list, list_containing_t value);
+}
+
 // ----- modifiers -----
 
 namespace slow {
-// change capacity of list
-// LIST_ERRNO resize(list_t *list, size_t new_capacity);
+    // change capacity of list
+    LIST_ERRNO resize(list_t *list, size_t new_capacity);
 }
 
 // insert new value after element_idx
@@ -98,6 +108,9 @@ void pop_front(list_t *list);
 
 // pop value at last list position
 void pop_back(list_t *list);
+
+// swap two value
+void swap(list_t *list, size_t el_idx_1, size_t el_idx_2);
 
 // ----- operations -----
 

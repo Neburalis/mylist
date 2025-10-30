@@ -14,6 +14,10 @@ namespace mylist {
 
 const int POISON = 0xDEDB333C0CA1;
 
+int list_contairing_t_comparator(int first, int second) {
+    return first - second;
+}
+
 // typedef int list_containing_t;
 
 // enum LIST_ERRNO {
@@ -45,9 +49,6 @@ list_t * constructor(size_t capacity) {
 
     if (list == NULL)
         return NULL;
-
-    if (capacity < 10) // Если список будет очень маленьким при реалокации будет тратиться много времени
-        capacity = 10;
 
     ++capacity; // Добавляем zombi 0 элемент, индексируем с 1
 
@@ -151,29 +152,88 @@ size_t get_prev_element(list_t *list, size_t element_idx) {
     return list->elements[element_idx].prev;
 }
 
-// LIST_ERRNO slow::resize(list_t *list, size_t new_capacity) {
-//     verifier(list) verified(return list->errno;);
-//
-//     if (new_capacity <= list->size)
-//         return LIST_OVERFLOW;
-//
-//     list_element_t *new_buf = (list_element_t *) realloc(list->elements, new_capacity);
-//     if (new_buf == NULL) {
-//         return LIST_CANNOT_REALLOC_MEMORY;
-//     }
-//     list->elements = new_buf;
-//     list->capacity = new_capacity;
-//
-//     for (size_t i = list->free_idx; i < list->capacity - 1; ++i) {
-//         list->elements[i].next = i + 1;
-//         list->elements[i].prev = SIZE_T_MAX;
-//     }
-//
-//     list->elements[list->capacity - 1].next = 0; // После последнего ничего не идет
-//     list->elements[list->capacity - 1].prev = SIZE_T_MAX;
-//
-//     return LIST_NO_PROBLEM;
-// }
+size_t slow::index(list_t *list, size_t logic_index) {
+    verifier(list) verified(return 0;);
+
+    size_t now_logic_index = 0;
+    for (size_t i = front(list); i != 0; i = get_next_element(list, i), ++now_logic_index) {
+        if (now_logic_index == logic_index)
+            return i;
+    }
+    return 0;
+}
+
+size_t slow::search(list_t *list, list_containing_t value) {
+    verifier(list) verified(return 0;);
+
+    list_element_t *elements = list->elements; // "кешируем" массив, чтобы каждый раз не ходить по указателю на list
+
+    for (size_t i = front(list); i != 0; i = get_next_element(list, i)) {
+        if (list_contairing_t_comparator(elements[i].data, value) == 0)
+            return i;
+    }
+    return 0;
+}
+
+// ------------------------------ modifiers ------------------------------
+
+LIST_ERRNO slow::resize(list_t *list, size_t new_capacity) {
+    verifier(list) || list->errno == LIST_OVERFLOW verified(return list->errno;);
+
+    if (new_capacity++ <= size(list))
+        return LIST_OVERFLOW;
+
+    list_element_t *old_elements = list->elements;
+    list_element_t *new_buf = (list_element_t *) calloc(new_capacity, sizeof(list_element_t));
+    if (new_buf == NULL) {
+        return LIST_CANNOT_REALLOC_MEMORY;
+    }
+
+    // list_t tmp_list = *list;
+    // tmp_list.elements = new_buf;
+    // tmp_list.capacity = new_capacity;
+
+    // dump(list, stdout, "logs/test", "Dump old list into resize after create new buf");
+    // dump(&tmp_list, stdout, "logs/test", "Dump new list into resize after create new buf");
+    // printf("\n\n\n");
+
+    new_buf[0].data = POISON;
+    new_buf[0].next = 1;
+    size_t new_idx = 1;
+    size_t old_idx = front(list);
+    do {
+        new_buf[new_idx].data = old_elements[old_idx].data;
+        new_buf[new_idx].next = new_idx + 1;
+        new_buf[new_idx].prev = new_idx - 1;
+        ++new_idx;
+        old_idx = get_next_element(list, old_idx);
+        // printf("old_idx = %zu \tnew_idx = %zu\n", old_idx, new_idx);
+        // dump(list, stdout, "logs/test", "Dump old list into resize into while iteration");
+        // dump(&tmp_list, stdout, "logs/test", "Dump new list into resize into while iteration");
+        // printf("\n\n\n");
+    } while (old_idx != 0);
+
+    new_buf[--new_idx] /*последний не пустой*/ .next = 0;
+    new_buf[0].prev = new_idx;
+
+    list->elements = new_buf;
+    list->free_idx = ++new_idx;
+    list->capacity = new_capacity;
+
+    for ( ; new_idx < new_capacity - 1; ++new_idx) {
+        // printf("[%zu]\t", new_idx);
+        new_buf[new_idx].prev = SIZE_T_MAX;
+        new_buf[new_idx].next = new_idx + 1;
+        // printf(".prev = %lld \t.next = %lld\n", new_buf[new_idx].prev, new_buf[new_idx].next);
+    }
+
+    new_buf[new_idx].prev = SIZE_T_MAX;
+    new_buf[new_idx].next = 0;
+
+    // dump(list, stdout, "logs/test", "Dump new list into resize into while iteration");
+    free(old_elements);
+    return LIST_NO_PROBLEM;
+}
 
 // Вернет индекс новой ячейки (список свободных будет валидным после вызова)
 function size_t alloc_new_list_element(list_t *list) {
@@ -188,8 +248,6 @@ function size_t alloc_new_list_element(list_t *list) {
     list->free_idx = new_free_idx;
     return free_el_idx;
 }
-
-// ------------------------------ modifiers ------------------------------
 
 function size_t _push_to_empty(list_t *list, list_containing_t value) {
     verifier(list) verified(printf("error state\n"); return 0;);
@@ -319,6 +377,18 @@ void pop_front(list_t *list) {
 
 void pop_back(list_t *list) {
     erase(list, back(list));
+}
+
+void swap(list_t *list, size_t el_idx_1, size_t el_idx_2) {
+    verifier(list) verified(printf("error state\n"); return;);
+
+    list_element_t *elements = list->elements; // "кешируем" массив, чтобы каждый раз не ходить по указателю на list
+
+    elements[get_prev_element(list, el_idx_1)].next = el_idx_2;
+    elements[get_prev_element(list, el_idx_2)].next = el_idx_1;
+
+    elements[get_next_element(list, el_idx_1)].prev = el_idx_2;
+    elements[get_next_element(list, el_idx_2)].prev = el_idx_1;
 }
 
 }
