@@ -28,14 +28,18 @@ void print_centered(FILE * fp, const char *str, int field_width) {
 }
 
 void _generate_dot_dump(list_t *list, FILE * fp) {
+    verifier(list);
     fprintf(fp,
         "digraph DoublyLinkedList {\n"
         "\t// Настройки графа\n"
-        "\trankdir=LR;\n"
-        "\tsplines=ortho\n"
-        "\tranksep=0.0\n"
+        "\trankdir=\"LR\";\n");
+    if (list->errno != LIST_NO_PROBLEM) {
+        fprintf(fp, "\tsplines=ortho\n");
+    }
+    fprintf(fp, "\tranksep=0.0\n"
+        "\tnodesep=0.08\n"
         "\n"
-        "\tnode [shape=record, height=0.5];\n"
+        "\tnode [shape=record, height=0.5, color = \"red\", fontcolor = \"red\", style = \"filled\", fillcolor = \"#ffc5c5\"];\n"
         "\tedge [arrowsize=0.8, minlen=4];\n"
         "\n");
 
@@ -43,17 +47,24 @@ void _generate_dot_dump(list_t *list, FILE * fp) {
 
     list_element_t *elements = list->elements;
 
-    fprintf(fp, "\tnode0 [label=\"<index> index = 0 | <data> data = PSN | { <prev> prev = %lld | <next> next = %zu}\"];\n", elements[0].prev, elements[0].next);
+    fprintf(fp, "\tnode0 [label=\"<index> index = 0 | <data> data = PSN | { <prev> prev = %lld | <next> next = %zu}\", color = \"black\", fontcolor = \"black\", fillcolor = \"#adeda7ff\"];\n", elements[0].prev, elements[0].next);
 
-    for (size_t i = front(list), j = get_next_element(list, i); // Добавляем занятые
-            i != 0 ; i = j, j = get_next_element(list, j)) {
-        fprintf(fp, "\tnode%zu [label=\"<index> index = %zu | <data> data = %d | { <prev> prev = %lld | <next> next = %zu}\"];\n",
-            i, i, elements[i].data, elements[i].prev, elements[i].next);
-    }
-    for (size_t i = list->free_idx, j = get_next_element(list, i); // Добавляем свободные
-            i != 0 ; i = j, j = get_next_element(list, j)) {
-        fprintf(fp, "\tnode%zu [label=\"<index> index = %zu | <data> data = empty | { <prev> prev = %lld | <next> next = %zu}\", color = \"#e39e3d\"];\n",
-            i, i, elements[i].prev, elements[i].next);
+    // for (size_t i = front(list), j = get_next_element(list, i); // Добавляем занятые
+    //         i != 0 ; i = j, j = get_next_element(list, j)) {
+    //     fprintf(fp, "\tnode%zu [label=\"<index> index = %zu | <data> data = %d | { <prev> prev = %lld | <next> next = %zu}\"];\n",
+    //         i, i, elements[i].data, elements[i].prev, elements[i].next);
+    // }
+
+    for (size_t i = 1; i < list->capacity; ++i) {
+        if (elements[i].prev == SIZE_T_MAX) { // Это free элемент
+            // printf("free node%zu\n", i);
+            fprintf(fp, "\tnode%zu [label=\"<index> index = %zu | <data> data = empty | { <prev> prev = %lld | <next> next = %zu}\", color = \"#ff9500ff\", fontcolor = \"black\", fillcolor = \"#ffd997\"];\n",
+                i, i, elements[i].prev, elements[i].next);
+        } else { // Это занятый элемент
+            // printf("node%zu\n", i);
+            fprintf(fp, "\tnode%zu [label=\"<index> index = %zu | <data> data = %d | { <prev> prev = %lld | <next> next = %zu}\", color = \"black\", fontcolor = \"black\", fillcolor = \"#d0ceceff\"];\n",
+                        i, i, elements[i].data, elements[i].prev, elements[i].next);
+        }
     }
 
     fprintf(fp,
@@ -61,49 +72,63 @@ void _generate_dot_dump(list_t *list, FILE * fp) {
         "\t// Выравнивание\n"
     );
 
-    for (size_t i = 1; i < capacity(list); ++i) {
-        fprintf(fp, "\tnode%zu -> node%zu [weight=100, style=invis];\n", i-1, i);
+    for (size_t i = 1; i <= capacity(list); ++i) {
+        fprintf(fp, "\tnode%zu -> node%zu [weight=100, color = \"#ffffff\"];\n", i-1, i);
     }
 
     fprintf(fp, "\n\t// Связи next\n");
 
-    for (size_t i = front(list), j = get_next_element(list, i);
-            j != 0 ; i = j, j = get_next_element(list, j)) {
-        fprintf(fp, "\tnode%zu -> node%zu [color = \"#0c0ccc\"];\n", i, j);
+    size_t el1 = 0, el2 = get_next_element(list, el1);
+    for (size_t i = 0; i < list->size; ++i) {
+        if (el2 > list->capacity || el1 > list->capacity)
+            fprintf(fp, "\tnode%zu -> node%zu [color = \"#cc0c0cff\", constraint=false];\n", el1, el2);
+        else
+            fprintf(fp, "\tnode%zu -> node%zu [color = \"#0c0ccc\", constraint=false];\n", el1, el2);
+        el1 = el2;
+        el2 = get_next_element(list, el2);
     }
 
     fprintf(fp, "\n\t// Связи free\n");
 
     for (size_t i = list->free_idx, j = get_next_element(list, i);
-            j != 0 ; i = j, j = get_next_element(list, j)) {
-        fprintf(fp, "\tnode%zu -> node%zu [color = \"#e39e3d\"];\n", i, j);
+            i != 0 ; i = j, j = get_next_element(list, j)) {
+        fprintf(fp, "\tnode%zu -> node%zu [color = \"#e39e3d\", constraint=false];\n", i, j);
     }
 
     fprintf(fp, "\n\t// Связи prev\n");
 
-    for (size_t i = front(list), j = get_next_element(list, i);
-            j != 0 ; i = j, j = get_next_element(list, j)) {
-        fprintf(fp, "\tnode%zu -> node%zu [color = \"#3dad3d\", arrowhead=inv];\n", j, i);
+    // el1 = 0, el2 = get_next_element(list, el1);
+    // for (size_t i = 0, j = get_prev_element(list, i);
+    //         j != 0 ; i = j, j = get_prev_element(list, j)) {
+    //     // if (!(i > list->capacity || j > list->capacity))
+    //     fprintf(fp, "\tnode%zu -> node%zu [color = \"#3dad3d\", arrowhead=inv, constraint=false];\n", j, i);
+    // }
+
+    el1 = 0, el2 = get_prev_element(list, el1);
+    for (size_t i = 0; i < list->size; ++i) {
+        fprintf(fp, "\tnode%zu -> node%zu [color = \"#3dad3d\", constraint=false];\n", el1, el2);
+        el1 = el2;
+        el2 = get_prev_element(list, el2);
     }
 
-    fprintf(fp, "\n\t// Head, tail, free\n");
+//     fprintf(fp, "\n\t// Head, tail, free\n");
+//
+//     fprintf(fp,
+//         "\thead [label=\"head\", color = \"gray\", fontcolor = \"black\"];\n"
+//         "\ttail [label=\"tail\", color = \"gray\", fontcolor = \"black\"];\n"
+//         "\tfree [label=\"free\", color = \"#e39e3d\", fontcolor = \"black\"];\n"
+//         "\thead -> node%zu [color = \"gray\", constraint=false];\n"
+//         "\ttail -> node%zu [color = \"gray\", constraint=false];\n"
+//         "\tfree -> node%zu [color = \"#e39e3d\", constraint=false];\n",
+//         list->elements[0].next, list->elements[0].prev, list->free_idx
+//     );
 
-    fprintf(fp,
-        "\thead [label=\"head\", color = \"gray\"];\n"
-        "\ttail [label=\"tail\", color = \"gray\"];\n"
-        "\tfree [label=\"free\", color = \"#e39e3d\"];\n"
-        "\thead -> node%zu [color = \"gray\"];\n"
-        "\ttail -> node%zu [color = \"gray\"];\n"
-        "\tfree -> node%zu [color = \"#e39e3d\"];\n",
-        front(list), back(list), list->free_idx
-    );
-
-    if (front(list) < back(list)) {
-        fprintf(fp, "\thead -> tail [weight=100, style=invis];\n");
-    }
-    else {
-        fprintf(fp, "\ttail -> head [weight=100, style=invis];\n");
-    }
+    // if (front(list) < back(list)) {
+    //     fprintf(fp, "\thead -> tail [weight=100, style=invis];\n");
+    // }
+    // else {
+    //     fprintf(fp, "\ttail -> head [weight=100, style=invis];\n");
+    // }
 
     fprintf(fp, "}");
 }
@@ -140,14 +165,20 @@ const char *_generate_image(list_t *list, const char *dir_name) {
 
 void _dump_impl(list_t *list, FILE *logfile, const char *log_dirname, const char *prompt,
         int line, const char *func, const char *file) {
+    verifier(list);
     fprintf(logfile, "<h3>-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- "
         "LIST DUMP"" -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-</h3>\n");
     fprintf(logfile, "reason: %s\n", prompt);
     fprintf(logfile, "dump from %s:%d at %s\n", file, line, func);
     fprintf(logfile, "\n");
-    fprintf(logfile, "list struct at %p\n", list);
-    fprintf(logfile, "\tsize is %zu\t capacity is %zu\n", size(list), capacity(list));
-    fprintf(logfile, "\telements at %p\n", list->elements);
+    fprintf(logfile, "list struct at <font style=\"color :#03CFCF;\">%p</font>\n", list);
+    fprintf(logfile, "size is %zu\t capacity is %zu\n", list->size, list->capacity);
+    fprintf(logfile, "front is %zu\t back is %zu\n", list->elements[0].next, list->elements[0].prev);
+    fprintf(logfile, "free_idx is %zu\n", list->free_idx);
+    if (list->errno != LIST_NO_PROBLEM) {
+        fprintf(logfile, "<font style=\"color :red;\">LIST in invalid state</font>, errno is %s\n", error(list));
+    }
+    fprintf(logfile, "elements at <font style=\"color :#03CFCF;\">%p</font>\n\n", list->elements);
 
     list_element_t *elements = list->elements;
 
@@ -198,7 +229,7 @@ void _dump_impl(list_t *list, FILE *logfile, const char *log_dirname, const char
         print_centered(logfile, CTPOKA, 9);
         fprintf(logfile, "|");
     }
-    fprintf(logfile, "\n");
+    fprintf(logfile, "\n\n");
 
     const char * image_filename = _generate_image(list, log_dirname);
 

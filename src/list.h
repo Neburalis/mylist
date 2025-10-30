@@ -9,13 +9,33 @@ typedef int list_containing_t;
 
 int list_contairing_t_comparator(int first, int second);
 
+// Detailed error codes used by the list implementation. Prefer using the most
+// specific code when setting `list->errno` so caller can diagnose failures.
+// Notes:
+//  - Many routines expect `list->size` to include the sentinel/zombie element
+//    at index 0 (so an empty list has size == 1).
+//  - Index 0 is a valid sentinel. Cycles that reach index 0 are considered
+//    part of the valid circular sentinel scheme; cycles that revisit a
+//    non-zero node are reported as corruption errors.
 enum LIST_ERRNO {
     LIST_NO_PROBLEM = 0,
-    LIST_POISON_COLLISION,
-    LIST_CANNOT_ALLOC_MEMORY,
-    LIST_CANNOT_REALLOC_MEMORY,
-    LIST_OVERFLOW,
-    LIST_INTERNAL_STRUCT_DAMAGED,
+    LIST_POISON_COLLISION,         // attempted to store a POISON value
+
+    // Memory errors
+    LIST_CANNOT_ALLOC_MEMORY,      // calloc/malloc failed
+    LIST_CANNOT_REALLOC_MEMORY,    // realloc/copy failed
+
+    // Logical errors
+    LIST_OVERFLOW,                 // no free element available
+    LIST_INTERNAL_STRUCT_DAMAGED,  // generic internal corruption (fallback)
+
+    LIST_NULL_POINTER,             // a required pointer (e.g. elements) is NULL
+    LIST_INVALID_INDEX,            // encountered an index >= capacity
+    LIST_FREE_LIST_CORRUPT,        // free-list chain is corrupted/invalid
+    LIST_SIZE_MISMATCH,            // list->size doesn't match actual elements
+    LIST_CORRUPTED_NEXT,           // detected inconsistency in `.next` chain
+    LIST_CORRUPTED_PREV,           // detected inconsistency in `.prev` pointers
+
 };
 
 typedef struct {
@@ -37,6 +57,8 @@ list_t * constructor(size_t capacity);
 
 // destructs the list
 void destructor(list_t **list_ptr);
+
+const char *error(list_t *list);
 
 // verify state of list
 // return true if in valid state, false if in incorrect state

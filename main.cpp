@@ -21,6 +21,10 @@ const char *create_dump_directory() {
     return buf;
 }
 
+#define DO(code) \
+    code         \
+    dump(list, logfile, dump_dirname, "Dump after doing <font style=\"color: blue;\">" #code "</font>");
+
 int main() {
     printf("Hello, kitty!\n");
     const char * dump_dirname = create_dump_directory();
@@ -41,26 +45,36 @@ int main() {
 
     mylist::list_t *list = mylist::constructor(3);
 
-    size_t idx1 = push_front(list, 5);
-    dump(list, logfile, dump_dirname, "Dump after adding 5");
+    DO(size_t idx1 = push_front(list, 5);)
 
-    push_front(list, 4);
-    dump(list, logfile, dump_dirname, "Dump after adding 4");
+    DO(push_front(list, 4);)
 
-    slow::resize(list, 10);
-    dump(list, logfile, dump_dirname, "Dump after resize");
+    DO(list->elements[1].next = 690;)
+    // printf("%d", verifier(list));
 
-    push_front(list, 3);
-    dump(list, logfile, dump_dirname, "Dump after adding 3");
+    DO(slow::resize(list, 10);)
 
-    insert(list, idx1, 52);
-    dump(list, logfile, dump_dirname, "Dump after adding 52");
+    DO(push_front(list, 3);)
 
-    emplace(list, idx1, 1000-7);
-    dump(list, logfile, dump_dirname, "Dump after adding 1000-7 𝕯𝖊𝖆𝖉 𝖎𝖓𝖘𝖎𝖉𝖊");
+    DO(insert(list, idx1, 52);)
 
-    push_back(list, 1);
-    dump(list, logfile, dump_dirname, "Dump after adding 1 to back");
+    DO(emplace(list, idx1, 1000-7);)
+
+    DO(erase(list, 2);)
+
+    DO(push_back(list, 1);)
+
+    // DO(list->size = 4;)
+    // printf("%d", verifier(list));
+
+    for (int i = 3; i < 7; ++i) {
+        DO(push_front(list, i*10);)
+    }
+
+    DO(pop_back(list);)
+    DO(pop_front(list);)
+    DO(erase(list, 4);)
+    DO(erase(list, 6);)
 
     destructor(&list);
 

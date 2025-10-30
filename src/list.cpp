@@ -9,6 +9,9 @@
 
 namespace mylist {
 
+#define eval_print(code) \
+    printf("%s = %lld\n", #code, (code))
+
 #define verified(code) \
     || ({code; false;})
 
@@ -97,14 +100,124 @@ void destructor(list_t **list_ptr) {
     *list_ptr = NULL;
 }
 
+const char *error(list_t *list) {
+    switch(list->errno) {
+        case LIST_NO_PROBLEM:               return "LIST_NO_PROBLEM";
+        case LIST_POISON_COLLISION:         return "LIST_POISON_COLLISION";
+        case LIST_CANNOT_ALLOC_MEMORY:      return "LIST_CANNOT_ALLOC_MEMORY";
+        case LIST_CANNOT_REALLOC_MEMORY:    return "LIST_CANNOT_REALLOC_MEMORY";
+        case LIST_OVERFLOW:                 return "LIST_OVERFLOW";
+        case LIST_INTERNAL_STRUCT_DAMAGED:  return "LIST_INTERNAL_STRUCT_DAMAGED";
+        case LIST_NULL_POINTER:             return "LIST_NULL_POINTER";
+        case LIST_INVALID_INDEX:            return "LIST_INVALID_INDEX";
+        case LIST_FREE_LIST_CORRUPT:        return "LIST_FREE_LIST_CORRUPT";
+        case LIST_SIZE_MISMATCH:            return "LIST_SIZE_MISMATCH";
+        case LIST_CORRUPTED_NEXT:           return "LIST_CORRUPTED_NEXT";
+        case LIST_CORRUPTED_PREV:           return "LIST_CORRUPTED_PREV";
+        default:                            return "Unknown error";
+    }
+}
+
 bool verifier(list_t *list) {
     if (list == NULL)           return false;
-    if (list->elements == NULL) {
-        list->errno = LIST_INTERNAL_STRUCT_DAMAGED;
+
+    list_element_t *elements = list->elements; // "кешируем" массив, чтобы каждый раз не ходить по указателю на list
+    if (elements == NULL) {
+        list->errno = LIST_NULL_POINTER;
         return false;
     }
+
     if (list->errno != LIST_NO_PROBLEM)
         return false;
+
+    if (list->capacity == 0 || list->size == 0 || list->size > list->capacity) {
+        list->errno = LIST_SIZE_MISMATCH;
+        return false;
+    }
+
+    unsigned char *visited = (unsigned char *) calloc(list->capacity, sizeof(unsigned char));
+    if (visited == NULL) {
+        list->errno = LIST_CANNOT_ALLOC_MEMORY;
+        return false;
+    }
+
+    size_t count = 0;
+    size_t prev_idx = 0;
+    size_t curr = elements[0].next; // head
+    size_t last = 0;
+
+    while (curr != 0) {
+        if (curr >= list->capacity) {
+            list->errno = LIST_INVALID_INDEX;
+            free(visited);
+            return false;
+        }
+        if (visited[curr]) {
+            // revisited a non-zero node -> cycle not passing through 0
+            list->errno = LIST_CORRUPTED_NEXT;
+            free(visited);
+            return false;
+        }
+        if (elements[curr].prev != prev_idx) {
+            list->errno = LIST_CORRUPTED_PREV;
+            free(visited);
+            return false;
+        }
+        visited[curr] = 1;
+        last = curr;
+        prev_idx = curr;
+        curr = elements[curr].next;
+        ++count;
+        if (count > list->capacity) {
+            list->errno = LIST_CORRUPTED_NEXT;
+            free(visited);
+            return false;
+        }
+    }
+
+    size_t free_curr = list->free_idx;
+    size_t free_count = 0;
+    while (free_curr != 0) {
+        if (free_curr >= list->capacity) {
+            list->errno = LIST_INVALID_INDEX;
+            free(visited);
+            return false;
+        }
+        if (visited[free_curr] == 2) {
+            // уже встречали этот элемент в free-list -> цикл
+            list->errno = LIST_FREE_LIST_CORRUPT;
+            free(visited);
+            return false;
+        }
+        if (visited[free_curr] == 1) {
+            // элемент, который помечен как активный, находится в free-list -> повреждение
+            list->errno = LIST_FREE_LIST_CORRUPT;
+            free(visited);
+            return false;
+        }
+        visited[free_curr] = 2;
+        free_curr = elements[free_curr].next;
+        ++free_count;
+        if (free_count > list->capacity) {
+            list->errno = LIST_FREE_LIST_CORRUPT;
+            free(visited);
+            return false;
+        }
+    }
+
+    if (elements[0].prev != last) {
+        list->errno = LIST_CORRUPTED_PREV;
+        free(visited);
+        return false;
+    }
+
+    if (list->size != count + 1) {
+        list->errno = LIST_SIZE_MISMATCH;
+        free(visited);
+        return false;
+    }
+
+    free(visited);
     return true;
 }
 
@@ -130,26 +243,26 @@ size_t capacity(list_t *list) {
 
 size_t front(list_t *list) {
     verifier(list) verified(return 0;);
-    if (!empty(list))
-        return list->elements[0].next; // list.head
-    else return 0;
+    return list->elements[0].next; // list.head
 }
 
 size_t back(list_t *list) {
     verifier(list) verified(return 0;);
-    if (!empty(list))
-        return list->elements[0].prev; // list.tail
-    else return 0;
+    return list->elements[0].prev; // list.tail
 }
 
 size_t get_next_element(list_t *list, size_t element_idx) {
-    verifier(list) verified(return 0;);
-    return list->elements[element_idx].next;
+    // verifier(list) verified(return 0;);
+    if (element_idx < list->capacity)
+        return list->elements[element_idx].next;
+    return 0;
 }
 
 size_t get_prev_element(list_t *list, size_t element_idx) {
-    verifier(list) verified(return 0;);
-    return list->elements[element_idx].prev;
+    // verifier(list) verified(return 0;);
+    if (element_idx < list->capacity)
+        return list->elements[element_idx].prev;
+    return 0;
 }
 
 size_t slow::index(list_t *list, size_t logic_index) {
@@ -288,11 +401,16 @@ size_t insert(list_t *list, size_t element_idx, list_containing_t value) {
     if (list->errno == LIST_OVERFLOW) // Не хватает места для вставки, пользователю необходимо расширить список
         return 0;
 
+    // eval_print(paste_place);
     elements[paste_place].prev = element_idx;
     elements[paste_place].next = next_el_idx;
     elements[paste_place].data = value;
+    // eval_print(element_idx);
     elements[element_idx].next = paste_place;
+    // eval_print(next_el_idx);
     elements[next_el_idx].prev = paste_place;
+
+    ++list->size;
 
     return paste_place;
 }
@@ -318,6 +436,8 @@ size_t emplace(list_t *list, size_t element_idx, list_containing_t value) {
     elements[paste_place].data = value;
     elements[element_idx].prev = paste_place;
     elements[prev_el_idx].next = paste_place;
+
+    ++list->size;
 
     return paste_place;
 }
@@ -349,9 +469,11 @@ size_t push_back(list_t *list, list_containing_t value) {
 
     list_element_t *elements = list->elements; // "кешируем" массив, чтобы каждый раз не ходить по указателю на list
 
+    eval_print(empty(list));
     if (empty(list)) {
         return _push_to_empty(list, value);
     } else { // Не пустой
+        eval_print(back(list));
         return insert(list, back(list), value);
     }
 }
