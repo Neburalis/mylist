@@ -39,13 +39,16 @@ int main() {
         "<body>\n"
         "<pre>\n", start_time_string);
 
-    mylist::list_t *list = mylist::constructor(10);
+    mylist::list_t *list = mylist::constructor(3);
 
     size_t idx1 = push_front(list, 5);
     dump(list, logfile, dump_dirname, "Dump after adding 5");
 
     push_front(list, 4);
     dump(list, logfile, dump_dirname, "Dump after adding 4");
+
+    slow::resize(list, 10);
+    dump(list, logfile, dump_dirname, "Dump after resize");
 
     push_front(list, 3);
     dump(list, logfile, dump_dirname, "Dump after adding 3");
