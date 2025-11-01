@@ -15,7 +15,10 @@ namespace mylist {
 #define verified(code) \
     || ({code; false;})
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wconstant-conversion"
 const int POISON = 0xDEDB333C0CA1;
+#pragma clang diagnostic push
 
 int list_contairing_t_comparator(int first, int second) {
     return first - second;
@@ -25,11 +28,23 @@ int list_contairing_t_comparator(int first, int second) {
 
 // enum LIST_ERRNO {
 //     LIST_NO_PROBLEM = 0,
-//     LIST_POISON_COLLISION,
-//     LIST_CANNOT_ALLOC_MEMORY,
-//     LIST_CANNOT_REALLOC_MEMORY,
-//     LIST_OVERFLOW,
-//     LIST_INTERNAL_STRUCT_DAMAGED,
+//     LIST_POISON_COLLISION,         // attempted to store a POISON value
+//
+//     // Memory errors
+//     LIST_CANNOT_ALLOC_MEMORY,      // calloc/malloc failed
+//     LIST_CANNOT_REALLOC_MEMORY,    // realloc/copy failed
+//
+//     // Logical errors
+//     LIST_OVERFLOW,                 // no free element available
+//     LIST_INTERNAL_STRUCT_DAMAGED,  // generic internal corruption (fallback)
+//
+//     LIST_NULL_POINTER,             // a required pointer (e.g. elements) is NULL
+//     LIST_INVALID_INDEX,            // encountered an index >= capacity
+//     LIST_FREE_LIST_CORRUPT,        // free-list chain is corrupted/invalid
+//     LIST_SIZE_MISMATCH,            // list->size doesn't match actual elements
+//     LIST_LOOP_IN_NEXT,             // detected inconsistency in `.next` chain
+//     LIST_LOOP_IN_PREV,             // detected inconsistency in `.prev` pointers
+//     LIST_LOOP_IN_FREE,             // detected inconsistency in `.prev` pointers
 // };
 
 // typedef struct {
@@ -112,8 +127,9 @@ const char *error(list_t *list) {
         case LIST_INVALID_INDEX:            return "LIST_INVALID_INDEX";
         case LIST_FREE_LIST_CORRUPT:        return "LIST_FREE_LIST_CORRUPT";
         case LIST_SIZE_MISMATCH:            return "LIST_SIZE_MISMATCH";
-        case LIST_CORRUPTED_NEXT:           return "LIST_CORRUPTED_NEXT";
-        case LIST_CORRUPTED_PREV:           return "LIST_CORRUPTED_PREV";
+        case LIST_LOOP_IN_NEXT:           return "LIST_LOOP_IN_NEXT";
+        case LIST_LOOP_IN_PREV:           return "LIST_LOOP_IN_PREV";
+        case LIST_LOOP_IN_FREE:           return "LIST_LOOP_IN_FREE";
         default:                            return "Unknown error";
     }
 }
@@ -154,12 +170,12 @@ bool verifier(list_t *list) {
         }
         if (visited[curr]) {
             // revisited a non-zero node -> cycle not passing through 0
-            list->errno = LIST_CORRUPTED_NEXT;
+            list->errno = LIST_LOOP_IN_NEXT;
             free(visited);
             return false;
         }
         if (elements[curr].prev != prev_idx) {
-            list->errno = LIST_CORRUPTED_PREV;
+            list->errno = LIST_LOOP_IN_PREV;
             free(visited);
             return false;
         }
@@ -169,7 +185,7 @@ bool verifier(list_t *list) {
         curr = elements[curr].next;
         ++count;
         if (count > list->capacity) {
-            list->errno = LIST_CORRUPTED_NEXT;
+            list->errno = LIST_LOOP_IN_NEXT;
             free(visited);
             return false;
         }
@@ -177,19 +193,26 @@ bool verifier(list_t *list) {
 
     size_t free_curr = list->free_idx;
     size_t free_count = 0;
+    // printf("verify free idx in list\n");
     while (free_curr != 0) {
+        // eval_print(free_curr);
         if (free_curr >= list->capacity) {
+            // printf("if 1\n");
             list->errno = LIST_INVALID_INDEX;
             free(visited);
             return false;
         }
         if (visited[free_curr] == 2) {
             // уже встречали этот элемент в free-list -> цикл
-            list->errno = LIST_FREE_LIST_CORRUPT;
+            // printf("if 2\n");
+            list->errno = LIST_LOOP_IN_FREE;
+            // printf("MEOW\n");
             free(visited);
+            // printf("MEOW\n");
             return false;
         }
         if (visited[free_curr] == 1) {
+            // printf("if 3\n");
             // элемент, который помечен как активный, находится в free-list -> повреждение
             list->errno = LIST_FREE_LIST_CORRUPT;
             free(visited);
@@ -204,9 +227,10 @@ bool verifier(list_t *list) {
             return false;
         }
     }
+    // printf("\n\n\n");
 
     if (elements[0].prev != last) {
-        list->errno = LIST_CORRUPTED_PREV;
+        list->errno = LIST_LOOP_IN_PREV;
         free(visited);
         return false;
     }
@@ -290,63 +314,55 @@ size_t slow::search(list_t *list, list_containing_t value) {
 
 // ------------------------------ modifiers ------------------------------
 
-LIST_ERRNO slow::resize(list_t *list, size_t new_capacity) {
-    verifier(list) || list->errno == LIST_OVERFLOW verified(return list->errno;);
-
-    if (new_capacity++ <= size(list))
-        return LIST_OVERFLOW;
-
-    list_element_t *old_elements = list->elements;
-    list_element_t *new_buf = (list_element_t *) calloc(new_capacity, sizeof(list_element_t));
-    if (new_buf == NULL) {
-        return LIST_CANNOT_REALLOC_MEMORY;
-    }
-
-    // list_t tmp_list = *list;
-    // tmp_list.elements = new_buf;
-    // tmp_list.capacity = new_capacity;
-
-    // dump(list, stdout, "logs/test", "Dump old list into resize after create new buf");
-    // dump(&tmp_list, stdout, "logs/test", "Dump new list into resize after create new buf");
-    // printf("\n\n\n");
-
-    new_buf[0].data = POISON;
-    new_buf[0].next = 1;
-    size_t new_idx = 1;
-    size_t old_idx = front(list);
-    do {
-        new_buf[new_idx].data = old_elements[old_idx].data;
-        new_buf[new_idx].next = new_idx + 1;
-        new_buf[new_idx].prev = new_idx - 1;
-        ++new_idx;
-        old_idx = get_next_element(list, old_idx);
-        // printf("old_idx = %zu \tnew_idx = %zu\n", old_idx, new_idx);
-        // dump(list, stdout, "logs/test", "Dump old list into resize into while iteration");
-        // dump(&tmp_list, stdout, "logs/test", "Dump new list into resize into while iteration");
-        // printf("\n\n\n");
-    } while (old_idx != 0);
-
-    new_buf[--new_idx] /*последний не пустой*/ .next = 0;
-    new_buf[0].prev = new_idx;
-
-    list->elements = new_buf;
-    list->free_idx = ++new_idx;
-    list->capacity = new_capacity;
-
-    for ( ; new_idx < new_capacity - 1; ++new_idx) {
-        // printf("[%zu]\t", new_idx);
-        new_buf[new_idx].prev = SIZE_T_MAX;
-        new_buf[new_idx].next = new_idx + 1;
-        // printf(".prev = %lld \t.next = %lld\n", new_buf[new_idx].prev, new_buf[new_idx].next);
-    }
-
-    new_buf[new_idx].prev = SIZE_T_MAX;
-    new_buf[new_idx].next = 0;
-
-    // dump(list, stdout, "logs/test", "Dump new list into resize into while iteration");
-    free(old_elements);
-    return LIST_NO_PROBLEM;
-}
+// LIST_ERRNO slow::resize(list_t *list, size_t new_capacity) {
+//     verifier(list) || list->errno == LIST_OVERFLOW verified(return list->errno;);
+//
+//     if (new_capacity++ <= size(list))
+//         return LIST_OVERFLOW;
+//
+//     list_element_t *old_elements = list->elements;
+//     list_element_t *new_buf = (list_element_t *) calloc(new_capacity, sizeof(list_element_t));
+//     if (new_buf == NULL) {
+//         return LIST_CANNOT_REALLOC_MEMORY;
+//     }
+//
+//     new_buf[0].data = POISON;
+//     new_buf[0].next = 1;
+//     size_t new_idx = 1;
+//     size_t old_idx = front(list);
+//     do {
+//         new_buf[new_idx].data = old_elements[old_idx].data;
+//         new_buf[new_idx].next = new_idx + 1;
+//         new_buf[new_idx].prev = new_idx - 1;
+//         ++new_idx;
+//         old_idx = get_next_element(list, old_idx);
+//     } while (old_idx != 0);
+//
+//     new_buf[--new_idx] /*последний не пустой*/ .next = 0;
+//     new_buf[0].prev = new_idx;
+//
+//     list->elements = new_buf;
+//     list->free_idx = ++new_idx;
+//     list->capacity = new_capacity;
+//
+//     for ( ; new_idx < new_capacity - 1; ++new_idx) {
+//         // printf("[%zu]\t", new_idx);
+//         new_buf[new_idx].prev = SIZE_T_MAX;
+//         new_buf[new_idx].next = new_idx + 1;
+//         // printf(".prev = %lld \t.next = %lld\n", new_buf[new_idx].prev, new_buf[new_idx].next);
+//     }
+//
+//     new_buf[new_idx].prev = SIZE_T_MAX;
+//     new_buf[new_idx].next = 0;
+//
+//     // dump(list, stdout, "logs/test", "Dump new list into resize into while iteration");
+//     free(old_elements);
+//     return LIST_NO_PROBLEM;
+// }
+//
+// LIST_ERRNO slow::linearization(list_t *list) {
+//
+// }
 
 // Вернет индекс новой ячейки (список свободных будет валидным после вызова)
 function size_t alloc_new_list_element(list_t *list) {
@@ -362,29 +378,6 @@ function size_t alloc_new_list_element(list_t *list) {
     return free_el_idx;
 }
 
-function size_t _push_to_empty(list_t *list, list_containing_t value) {
-    verifier(list) verified(printf("error state\n"); return 0;);
-
-    if (value == POISON) {
-        list->errno = LIST_POISON_COLLISION;
-        return 0;
-    }
-
-    list_element_t *elements = list->elements; // "кешируем" массив, чтобы каждый раз не ходить по указателю на list
-
-    size_t paste_place = alloc_new_list_element(list);
-    if (paste_place == 0)
-        return 0;
-
-    elements[paste_place].next = elements[paste_place].prev = 0;
-    elements[paste_place].data = value;
-
-    list->elements[0].next /*list.head*/ = list->elements[0].prev /*list.tail*/ = paste_place;
-
-    ++list->size;
-    return paste_place;
-}
-
 size_t insert(list_t *list, size_t element_idx, list_containing_t value) {
     verifier(list) verified(return 0;);
 
@@ -397,6 +390,11 @@ size_t insert(list_t *list, size_t element_idx, list_containing_t value) {
 
     size_t next_el_idx = get_next_element(list, element_idx); // Следующий элемент за помещенным
     size_t paste_place = alloc_new_list_element(list);        // Место куда помещаем новый элемент
+
+    // if (!(is_line == true && paste_place = element_idx + 1 && next_el_idx == 0)) {
+    //     list->is_line = false;
+    // }
+
 
     if (list->errno == LIST_OVERFLOW) // Не хватает места для вставки, пользователю необходимо расширить список
         return 0;
@@ -450,13 +448,7 @@ size_t push_front(list_t *list, list_containing_t value) {
         return 0;
     }
 
-    list_element_t *elements = list->elements; // "кешируем" массив, чтобы каждый раз не ходить по указателю на list
-
-    if (empty(list)) {
-        return _push_to_empty(list, value);
-    } else { // Не пустой
-        return emplace(list, front(list), value);
-    }
+    return emplace(list, front(list), value);
 }
 
 size_t push_back(list_t *list, list_containing_t value) {
@@ -467,15 +459,9 @@ size_t push_back(list_t *list, list_containing_t value) {
         return 0;
     }
 
-    list_element_t *elements = list->elements; // "кешируем" массив, чтобы каждый раз не ходить по указателю на list
-
-    eval_print(empty(list));
-    if (empty(list)) {
-        return _push_to_empty(list, value);
-    } else { // Не пустой
-        eval_print(back(list));
-        return insert(list, back(list), value);
-    }
+    // eval_print(empty(list));
+    // eval_print(back(list));
+    return insert(list, back(list), value);
 }
 
 void erase(list_t *list, size_t element_idx) {
@@ -486,7 +472,7 @@ void erase(list_t *list, size_t element_idx) {
     elements[elements[element_idx].prev].next = elements[element_idx].next;
     elements[elements[element_idx].next].prev = elements[element_idx].prev;
 
-    elements[element_idx].prev = -1;
+    elements[element_idx].prev = SIZE_T_MAX;
     elements[element_idx].next = list->free_idx;
 
     --list->size;

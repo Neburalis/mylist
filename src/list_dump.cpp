@@ -14,15 +14,15 @@
 
 namespace mylist {
 
-void print_centered(FILE * fp, const char *str, int field_width) {
-    size_t str_len = strlen(str);
+void print_centered(FILE * fp, const char *str, uint32_t field_width) {
+    uint32_t str_len = (uint32_t) strlen(str);
     if (str_len >= field_width) {
         fprintf(fp, "%s", str); // If string is too long, print as-is
         return;
     }
 
-    size_t left_padding = (field_width - str_len) / 2;
-    size_t right_padding = field_width - str_len - left_padding;
+    uint32_t left_padding = (field_width - str_len) / 2;
+    uint32_t right_padding = field_width - str_len - left_padding;
 
     fprintf(fp, "%*s%s%*s", left_padding, "", str, right_padding, "");
 }
@@ -33,9 +33,6 @@ void _generate_dot_dump(list_t *list, FILE * fp) {
         "digraph DoublyLinkedList {\n"
         "\t// Настройки графа\n"
         "\trankdir=\"LR\";\n");
-    if (list->errno != LIST_NO_PROBLEM) {
-        fprintf(fp, "\tsplines=ortho\n");
-    }
     fprintf(fp, "\tranksep=0.0\n"
         "\tnodesep=0.08\n"
         "\n"
@@ -43,93 +40,65 @@ void _generate_dot_dump(list_t *list, FILE * fp) {
         "\tedge [arrowsize=0.8, minlen=4];\n"
         "\n");
 
-    // fprintf(fp, "\tlist_t [label=\"<head> head = %zu | <tail> tail = %zu | <free_idx> free_idx = %zu\"]\n", list->head, list->tail, list->free_idx);
-
     list_element_t *elements = list->elements;
-
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wformat"
     fprintf(fp, "\tnode0 [label=\"<index> index = 0 | <data> data = PSN | { <prev> prev = %lld | <next> next = %zu}\", color = \"black\", fontcolor = \"black\", fillcolor = \"#adeda7ff\"];\n", elements[0].prev, elements[0].next);
-
-    // for (size_t i = front(list), j = get_next_element(list, i); // Добавляем занятые
-    //         i != 0 ; i = j, j = get_next_element(list, j)) {
-    //     fprintf(fp, "\tnode%zu [label=\"<index> index = %zu | <data> data = %d | { <prev> prev = %lld | <next> next = %zu}\"];\n",
-    //         i, i, elements[i].data, elements[i].prev, elements[i].next);
-    // }
 
     for (size_t i = 1; i < list->capacity; ++i) {
         if (elements[i].prev == SIZE_T_MAX) { // Это free элемент
             // printf("free node%zu\n", i);
-            fprintf(fp, "\tnode%zu [label=\"<index> index = %zu | <data> data = empty | { <prev> prev = %lld | <next> next = %zu}\", color = \"#ff9500ff\", fontcolor = \"black\", fillcolor = \"#ffd997\"];\n",
+            fprintf(fp, "\tnode%zu [label=\"<index> index = %zu | <data> data = empty | { <prev> prev = %lld | <next> next = %zu}\", color = \"#f67c92ff\", fontcolor = \"black\", fillcolor = \"#d0ceceff\"];\n", // color = \"#ff9500ff\", fontcolor = \"black\", fillcolor = \"#ffd997\"
                 i, i, elements[i].prev, elements[i].next);
         } else { // Это занятый элемент
             // printf("node%zu\n", i);
-            fprintf(fp, "\tnode%zu [label=\"<index> index = %zu | <data> data = %d | { <prev> prev = %lld | <next> next = %zu}\", color = \"black\", fontcolor = \"black\", fillcolor = \"#d0ceceff\"];\n",
+            fprintf(fp, "\tnode%zu [label=\"<index> index = %zu | <data> data = %d | { <prev> prev = %lld | <next> next = %zu}\", color = \"#ff9500ff\", fontcolor = \"black\", fillcolor = \"#ffd997\"];\n",
                         i, i, elements[i].data, elements[i].prev, elements[i].next);
         }
     }
+#pragma clang diagnostic pop
 
     fprintf(fp,
         "\n"
         "\t// Выравнивание\n"
     );
 
-    for (size_t i = 1; i <= capacity(list); ++i) {
+    for (size_t i = 1; i < list ->capacity; ++i) {
         fprintf(fp, "\tnode%zu -> node%zu [weight=100, color = \"#ffffff\"];\n", i-1, i);
     }
 
     fprintf(fp, "\n\t// Связи next\n");
 
     size_t el1 = 0, el2 = get_next_element(list, el1);
+
     for (size_t i = 0; i < list->size; ++i) {
-        if (el2 > list->capacity || el1 > list->capacity)
+        // printf("MEOW\n");
+        // printf("i = %lld\n", i);
+        if (el1 == get_prev_element(list, el2)) {
+            fprintf(fp, "\tnode%zu -> node%zu [color = \"#000000\", constraint=false, dir=both];\n", el1, el2);
+        } else {
+            // --i;
             fprintf(fp, "\tnode%zu -> node%zu [color = \"#cc0c0cff\", constraint=false];\n", el1, el2);
-        else
-            fprintf(fp, "\tnode%zu -> node%zu [color = \"#0c0ccc\", constraint=false];\n", el1, el2);
+            fprintf(fp, "\tnode%zu -> node%zu [color = \"#3dad3d\", constraint=false];\n", get_prev_element(list, el2), el1);
+        }
         el1 = el2;
         el2 = get_next_element(list, el2);
     }
+    // }
 
     fprintf(fp, "\n\t// Связи free\n");
 
-    for (size_t i = list->free_idx, j = get_next_element(list, i);
-            i != 0 ; i = j, j = get_next_element(list, j)) {
-        fprintf(fp, "\tnode%zu -> node%zu [color = \"#e39e3d\", constraint=false];\n", i, j);
-    }
-
-    fprintf(fp, "\n\t// Связи prev\n");
-
-    // el1 = 0, el2 = get_next_element(list, el1);
-    // for (size_t i = 0, j = get_prev_element(list, i);
-    //         j != 0 ; i = j, j = get_prev_element(list, j)) {
-    //     // if (!(i > list->capacity || j > list->capacity))
-    //     fprintf(fp, "\tnode%zu -> node%zu [color = \"#3dad3d\", arrowhead=inv, constraint=false];\n", j, i);
-    // }
-
-    el1 = 0, el2 = get_prev_element(list, el1);
-    for (size_t i = 0; i < list->size; ++i) {
-        fprintf(fp, "\tnode%zu -> node%zu [color = \"#3dad3d\", constraint=false];\n", el1, el2);
+    el1 = list->free_idx;
+    for (size_t i = 0; i < list->capacity - list->size; ++i) {
+        el2 = get_next_element(list, el1);
+        if (get_prev_element(list, el2) == SIZE_T_MAX || el2 == 0) {
+            fprintf(fp, "\tnode%zu -> node%zu [color = \"#f67c92ff\", constraint=false];\n", el1, el2);
+        } else { // Попали в занятый элемент
+            fprintf(fp, "\tnode%zu -> node%zu [color = \"#cc0c0cff\", constraint=false];\n", el1, el2);
+            break; // Если пойдем дальше, то пойдем по занятым элементам, а это не то, что должен печатать этот цикл
+        }
         el1 = el2;
-        el2 = get_prev_element(list, el2);
     }
-
-//     fprintf(fp, "\n\t// Head, tail, free\n");
-//
-//     fprintf(fp,
-//         "\thead [label=\"head\", color = \"gray\", fontcolor = \"black\"];\n"
-//         "\ttail [label=\"tail\", color = \"gray\", fontcolor = \"black\"];\n"
-//         "\tfree [label=\"free\", color = \"#e39e3d\", fontcolor = \"black\"];\n"
-//         "\thead -> node%zu [color = \"gray\", constraint=false];\n"
-//         "\ttail -> node%zu [color = \"gray\", constraint=false];\n"
-//         "\tfree -> node%zu [color = \"#e39e3d\", constraint=false];\n",
-//         list->elements[0].next, list->elements[0].prev, list->free_idx
-//     );
-
-    // if (front(list) < back(list)) {
-    //     fprintf(fp, "\thead -> tail [weight=100, style=invis];\n");
-    // }
-    // else {
-    //     fprintf(fp, "\ttail -> head [weight=100, style=invis];\n");
-    // }
-
     fprintf(fp, "}");
 }
 
@@ -138,9 +107,9 @@ const char *_generate_image(list_t *list, const char *dir_name) {
 
     char tmp_dot_filename[128] = "";
     if (dir_name[strlen(dir_name) - 1] == '/')
-        snprintf(tmp_dot_filename, 128, "%slist_dump.dot.tmp", dir_name);
+        snprintf(tmp_dot_filename, 128, "%slist_dump_%zu.dot.tmp", dir_name, iter);
     else
-        snprintf(tmp_dot_filename, 128, "%s/list_dump.dot.tmp", dir_name);
+        snprintf(tmp_dot_filename, 128, "%s/list_dump_%zu.dot.tmp", dir_name, iter);
 
     FILE *tmp_dot_file = fopen(tmp_dot_filename, "w");
     _generate_dot_dump(list, tmp_dot_file);
@@ -221,6 +190,8 @@ void _dump_impl(list_t *list, FILE *logfile, const char *log_dirname, const char
     }
     fprintf(logfile, "\n");
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wformat"
     fprintf(logfile, "prev: |");
     for (size_t i = 0; i < list->capacity; ++i) {
         snprintf(CTPOKA, DLINA_CTPOKI, "%lld", elements[i].prev);
@@ -230,6 +201,7 @@ void _dump_impl(list_t *list, FILE *logfile, const char *log_dirname, const char
         fprintf(logfile, "|");
     }
     fprintf(logfile, "\n\n");
+#pragma clang diagnostic pop
 
     const char * image_filename = _generate_image(list, log_dirname);
 

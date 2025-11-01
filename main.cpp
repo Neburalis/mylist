@@ -8,7 +8,7 @@
 
 using namespace mylist;
 
-global const time_t _start_time = time(NULL) - (clock() / CLOCKS_PER_SEC);
+global const time_t _start_time = time(NULL) - (time_t)(clock() / CLOCKS_PER_SEC);
 
 const char *create_dump_directory() {
     create_folder_if_not_exists("logs/");
@@ -43,16 +43,22 @@ int main() {
         "<body>\n"
         "<pre>\n", start_time_string);
 
-    mylist::list_t *list = mylist::constructor(3);
+    mylist::list_t *list = mylist::constructor(11);
 
     DO(size_t idx1 = push_front(list, 5);)
 
     DO(push_front(list, 4);)
+    DO(push_front(list, 3);)
 
-    DO(list->elements[1].next = 690;)
-    // printf("%d", verifier(list));
+    // DO(list->elements[1].next = 690;) // LIST_INVALID_INDEX - цепочка next не приводит к концу списка
 
-    DO(slow::resize(list, 10);)
+    // DO(list->elements[1].next = 3;) // LIST_LOOP_IN_NEXT
+
+    // DO(list->elements[5].next = 3;) // LIST_FREE_LIST_CORRUPT - занятый элемент в free-list
+
+    // DO(list->elements[5].next = 4;) // LIST_LOOP_IN_FREE - цикл 5 -> 4; 4 -> 5
+
+    // DO(list->size = 2;) // LIST_SIZE_MISMATCH
 
     DO(push_front(list, 3);)
 
@@ -63,9 +69,6 @@ int main() {
     DO(erase(list, 2);)
 
     DO(push_back(list, 1);)
-
-    // DO(list->size = 4;)
-    // printf("%d", verifier(list));
 
     for (int i = 3; i < 7; ++i) {
         DO(push_front(list, i*10);)

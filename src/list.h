@@ -9,14 +9,6 @@ typedef int list_containing_t;
 
 int list_contairing_t_comparator(int first, int second);
 
-// Detailed error codes used by the list implementation. Prefer using the most
-// specific code when setting `list->errno` so caller can diagnose failures.
-// Notes:
-//  - Many routines expect `list->size` to include the sentinel/zombie element
-//    at index 0 (so an empty list has size == 1).
-//  - Index 0 is a valid sentinel. Cycles that reach index 0 are considered
-//    part of the valid circular sentinel scheme; cycles that revisit a
-//    non-zero node are reported as corruption errors.
 enum LIST_ERRNO {
     LIST_NO_PROBLEM = 0,
     LIST_POISON_COLLISION,         // attempted to store a POISON value
@@ -33,9 +25,9 @@ enum LIST_ERRNO {
     LIST_INVALID_INDEX,            // encountered an index >= capacity
     LIST_FREE_LIST_CORRUPT,        // free-list chain is corrupted/invalid
     LIST_SIZE_MISMATCH,            // list->size doesn't match actual elements
-    LIST_CORRUPTED_NEXT,           // detected inconsistency in `.next` chain
-    LIST_CORRUPTED_PREV,           // detected inconsistency in `.prev` pointers
-
+    LIST_LOOP_IN_NEXT,             // detected inconsistency in `.next` chain
+    LIST_LOOP_IN_PREV,             // detected inconsistency in `.prev` pointers
+    LIST_LOOP_IN_FREE,             // detected inconsistency in `.prev` pointers
 };
 
 typedef struct {
@@ -105,10 +97,12 @@ namespace slow {
 
 // ----- modifiers -----
 
-namespace slow {
-    // change capacity of list
-    LIST_ERRNO resize(list_t *list, size_t new_capacity);
-}
+// namespace slow {
+//     // change capacity of list
+//     LIST_ERRNO resize(list_t *list, size_t new_capacity);
+//
+//     LIST_ERRNO linearization(list_t *list);
+// }
 
 // insert new value after element_idx
 size_t insert(list_t *list, size_t element_idx, list_containing_t value);
