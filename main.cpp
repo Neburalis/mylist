@@ -21,9 +21,11 @@ const char *create_dump_directory() {
     return buf;
 }
 
-#define DO(code) \
-    code         \
-    dump(list, logfile, dump_dirname, "Dump after doing <font style=\"color: blue;\">" #code "</font>");
+#define DO(code)                                                                                          \
+    dump(list, logfile, dump_dirname, "Dump before doing <font style=\"color: blue;\">" #code "</font>"); \
+    code                                                                                                  \
+    dump(list, logfile, dump_dirname, "Dump after doing <font style=\"color: blue;\">" #code "</font>");  \
+    fprintf(logfile, "<hr>\n\n\n");
 
 int main() {
     printf("Hello, kitty!\n");
@@ -62,9 +64,16 @@ int main() {
 
     DO(push_front(list, 3);)
 
-    DO(insert(list, idx1, 52);)
+    dump(list, logfile, dump_dirname, "Dump before insert 52 after %zu\n", idx1);
+    insert(list, idx1, 52);
+    dump(list, logfile, dump_dirname, "Dump after insert 52 after %zu\n", idx1);
+    fprintf(logfile, "<hr>\n\n\n");
 
-    DO(emplace(list, idx1, 1000-7);)
+
+    dump(list, logfile, dump_dirname, "Dump before emplace 1000-7 before %zu\n", idx1);
+    emplace(list, idx1, 1000-7);
+    dump(list, logfile, dump_dirname, "Dump after emplace 1000-7 before %zu\n", idx1);
+    fprintf(logfile, "<hr>\n\n\n");
 
     DO(erase(list, 2);)
 

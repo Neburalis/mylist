@@ -4,6 +4,7 @@
 #include <string.h>
 #include <limits.h>
 #include <time.h>
+#include <stdarg.h>
 
 #include "list.h"
 #include "stringNthong.h"
@@ -132,12 +133,21 @@ const char *_generate_image(list_t *list, const char *dir_name) {
     return image_filename;
 }
 
-void _dump_impl(list_t *list, FILE *logfile, const char *log_dirname, const char *prompt,
-        int line, const char *func, const char *file) {
+void _dump_impl(list_t *list, FILE *logfile, const char *log_dirname,
+        int line, const char *func, const char *file,
+        const char *fmt, ...) { // TODO: атрибут чтобы компилятор проверял по правилам prinf fmt  |  Посмотреть tx_prinf /tx_scanf
     verifier(list);
-    fprintf(logfile, "<h3>-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- "
-        "LIST DUMP"" -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-</h3>\n");
-    fprintf(logfile, "reason: %s\n", prompt);
+    // fprintf(logfile, "<h3>-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- "
+        // "LIST DUMP"" -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-</h3>\n");
+
+    // format prompt (printf-like)
+    char prompt_buf[2048] = "";
+    va_list ap;
+    va_start(ap, file);
+    vsnprintf(prompt_buf, sizeof(prompt_buf), fmt, ap);
+    va_end(ap);
+
+    fprintf(logfile, "<h2>reason: %s</h2>\n", prompt_buf);
     fprintf(logfile, "dump from %s:%d at %s\n", file, line, func);
     fprintf(logfile, "\n");
     fprintf(logfile, "list struct at <font style=\"color :#03CFCF;\">%p</font>\n", list);
@@ -156,7 +166,7 @@ void _dump_impl(list_t *list, FILE *logfile, const char *log_dirname, const char
     print_centered(logfile, "", 6);
     fprintf(logfile, "|");
     for (size_t i = 0; i < list->capacity; ++i) {
-        snprintf(CTPOKA, DLINA_CTPOKI, "[%zu]", i);
+        snprintf(CTPOKA, sizeof(CTPOKA), "[%zu]", i);
         print_centered(logfile, CTPOKA, 9);
         fprintf(logfile, "|");
     }
@@ -166,13 +176,13 @@ void _dump_impl(list_t *list, FILE *logfile, const char *log_dirname, const char
     fprintf(logfile, "data: |");
     for (size_t i = 0; i < list->capacity; ++i) {
         if (i == 0)
-            snprintf(CTPOKA, DLINA_CTPOKI, "PSN");
+            snprintf(CTPOKA, sizeof(CTPOKA), "PSN");
         else if (i == free_idx) {
-            snprintf(CTPOKA, DLINA_CTPOKI, "empty");
+            snprintf(CTPOKA, sizeof(CTPOKA), "empty");
             free_idx = elements[free_idx].next;
         }
         else
-            snprintf(CTPOKA, DLINA_CTPOKI, "%d", elements[i].data);
+            snprintf(CTPOKA, sizeof(CTPOKA), "%d", elements[i].data);
 
         // fprintf(logfile, " [%zu] ", i);
         print_centered(logfile, CTPOKA, 9);
@@ -182,7 +192,7 @@ void _dump_impl(list_t *list, FILE *logfile, const char *log_dirname, const char
 
     fprintf(logfile, "next: |");
     for (size_t i = 0; i < list->capacity; ++i) {
-        snprintf(CTPOKA, DLINA_CTPOKI, "%zu", elements[i].next);
+        snprintf(CTPOKA, sizeof(CTPOKA), "%zu", elements[i].next);
 
         // fprintf(logfile, " [%zu] ", i);
         print_centered(logfile, CTPOKA, 9);
@@ -194,7 +204,7 @@ void _dump_impl(list_t *list, FILE *logfile, const char *log_dirname, const char
 #pragma clang diagnostic ignored "-Wformat"
     fprintf(logfile, "prev: |");
     for (size_t i = 0; i < list->capacity; ++i) {
-        snprintf(CTPOKA, DLINA_CTPOKI, "%lld", elements[i].prev);
+        snprintf(CTPOKA, sizeof(CTPOKA), "%lld", elements[i].prev);
 
         // fprintf(logfile, " [%zu] ", i);
         print_centered(logfile, CTPOKA, 9);

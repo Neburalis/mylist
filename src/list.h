@@ -2,6 +2,7 @@
 #define LIST_H
 
 #include <stddef.h>
+#include <stdio.h>
 
 namespace mylist {
 
@@ -58,12 +59,14 @@ bool verifier(list_t *list);
 
 void _generate_dot_dump(list_t *list, FILE * fp);
 const char *_generate_image(list_t *list, const char *dir_name);
-void _dump_impl(list_t *list, FILE *logfile, const char *log_dirname, const char *prompt,
-    int line, const char *func, const char *file);
+// fmt + variadic args (like printf) will be expanded in the dump
+void _dump_impl(list_t *list, FILE *logfile, const char *log_dirname,
+    int line, const char *func, const char *file,
+    const char *fmt, ...) __attribute__ (( format (printf, 7, 8)));
 
-// dump list to log
-#define dump(list, logfile, log_dirname, prompt) \
-    _dump_impl((list), (logfile), (log_dirname), (prompt), __LINE__, __FUNCTION__, __FILE__)
+// dump list to log — supports printf-like format and optional args
+#define dump(list, logfile, log_dirname, fmt, ...) \
+    _dump_impl((list), (logfile), (log_dirname), __LINE__, __PRETTY_FUNCTION__, __FILE__, (fmt), ##__VA_ARGS__)
 
 // ----- capacity ----
 

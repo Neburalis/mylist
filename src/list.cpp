@@ -284,7 +284,6 @@ size_t insert(list_t *list, size_t element_idx, list_containing_t value) {
     //     list->is_line = false;
     // }
 
-
     if (list->errno == LIST_OVERFLOW) // Не хватает места для вставки, пользователю необходимо расширить список
         return 0;
 
