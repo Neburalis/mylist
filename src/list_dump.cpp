@@ -13,7 +13,7 @@
 
 #include <stddef.h>
 
-namespace mylist {
+namespace mylist_aos {
 
 void print_centered(FILE * fp, const char *str, uint32_t field_width) {
     uint32_t str_len = (uint32_t) strlen(str);

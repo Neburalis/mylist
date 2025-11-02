@@ -3,7 +3,7 @@
 #include "list.h"
 #include "base.h"
 
-namespace mylist {
+namespace mylist_aos {
 
 bool verifier(list_t *list) {
     if (list == NULL)           return false;

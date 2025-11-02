@@ -6,7 +6,7 @@
 #include "list.h"
 #include "io_utils.h"
 
-using namespace mylist;
+using namespace mylist_aos;
 
 global const time_t _start_time = time(NULL) - (time_t)(clock() / CLOCKS_PER_SEC);
 
@@ -45,7 +45,7 @@ int main() {
         "<body>\n"
         "<pre>\n", start_time_string);
 
-    mylist::list_t *list = mylist::constructor(11);
+    mylist_aos::list_t *list = mylist_aos::constructor(11);
 
     DO(size_t idx1 = push_front(list, 5);)
 

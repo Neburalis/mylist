@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdio.h>
 
-namespace mylist {
+namespace mylist_aos {
 
 typedef int list_containing_t;
 

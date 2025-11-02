@@ -7,7 +7,7 @@
 #include "list.h"
 #include "base.h"
 
-namespace mylist {
+namespace mylist_aos {
 
 #define eval_print(code) \
     printf("%s = %lld\n", #code, (code))
