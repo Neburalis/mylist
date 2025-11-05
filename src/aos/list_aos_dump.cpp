@@ -143,7 +143,7 @@ void _dump_impl(list_t *list, FILE *logfile, const char *log_dirname,
     // format prompt (printf-like)
     char prompt_buf[2048] = "";
     va_list ap;
-    va_start(ap, file);
+    va_start(ap, fmt);
     vsnprintf(prompt_buf, sizeof(prompt_buf), fmt, ap);
     va_end(ap);
 
